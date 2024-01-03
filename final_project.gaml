@@ -1,22 +1,28 @@
 /**
 * Name: finalproject
 * Based on the internal empty template. 
-* Author: andreaslevander
+* Author: andreaslevander & edvin frosterud
 * Tags: 
-*/
+* 
+* TODO: 
+* - Add charisma system
+* - Add more locations
+* - Add more species
+* - Add ability for Guests(everyone) to buy themselves a drink.
+* - Flesh out introvert, perhaps by calculating locations where theres less people. 
+* - Let people define their own targets, kinda done but could use some overviews. 
+* -*/
 
 
 model finalproject
-
-/* Insert your model definition here */
 
 
 global {
 	init {
 		create Bar;
-		
 		create Introvert with: (target: nil);
 		create Extrovert with: (target: Introvert[0]);
+		create Dancer with: (target: Introvert[0]);
 	}
 	
 }
@@ -36,9 +42,12 @@ species Guest skills: [moving, fipa]{
 	float money <- 100.0;
 	float loudness;
 	rgb color;
+	rgb baseColor;
 	agent target;
 	float interaction_chance <- 1.0;
 	float try_to_interact <- 1.0;
+	float danceChance <- rnd(1.0);
+	int danceTimer <- 0;
 	
 	reflex move when: target != nil {
 		do goto target:target;
@@ -47,7 +56,13 @@ species Guest skills: [moving, fipa]{
 			target <- nil;
 		}
 	}
-	
+	reflex dancing when: danceTimer != 0{
+		danceTimer <- danceTimer - 1;
+		color <- rnd_color(255);
+		if(danceTimer = 0){
+			color <- baseColor;
+		}
+	}
 	reflex wander when: target = nil {
 		do wander;
 	}
@@ -55,7 +70,7 @@ species Guest skills: [moving, fipa]{
 		loop proposaltest over: informs{
 			string s <- proposaltest.contents[0] as string;
 			Guest sender <- proposaltest.sender as Guest;
-						Bar targetBar <- proposaltest.contents[1] as Bar;
+			Bar targetBar <- proposaltest.contents[1] as Bar;
 			
 			
 			switch(s){
@@ -79,6 +94,13 @@ species Guest skills: [moving, fipa]{
 						money <- money - 1;
 						targetBar.money <- targetBar.money + 1;
 						sender.loudness <- sender.loudness + 1;
+					}
+				}
+				match "Do you want to dance?"{
+					if(flip(danceChance)){
+						write(name + "joins in dancing with " + sender.name);
+						danceTimer <- 50;
+						target <- nil;
 					}
 				}
 			}
@@ -126,11 +148,12 @@ species Introvert parent: Guest {
 		loudness <- 0.0;
 		generosity <- rnd(1.0);
 		color <- rgb("blue");
+		baseColor <- color;
 	}
 	
 	action do_interaction {
 		
-		write "do interaction";
+		//TODO: Add possible introvert interaction? 
 	}
 }
 
@@ -139,29 +162,36 @@ species Extrovert parent: Guest {
 		loudness <- 0.0;
 		generosity <- 0.8;
 		color <- rgb("red");
+		baseColor <- color;
 	}
-
-
 	action do_interaction {
-		
 		// if they are feeling generous and have money try buying a drink
 		if flip(generosity) and money >= 1.0 {
-				//TODO: add charisma system?
+			//TODO: add charisma system?
 			Bar b <- Bar[rnd(length(Bar)-1)];
-				
 			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want a drink?", b];			// ask if they want drink
-			
-			
-			
-			
-			
-			ask target as Guest{
-				// buying a drink for target
-				write  myself.name + " buying a drink for " + self.name;
-				
-
-			}
 		}
+	}
+}
+
+species Dancer parent: Guest{
+	init{
+		loudness <- 4.0;
+		generosity <- rnd(0.0, 0.7);
+		color <- rgb("pink");
+		baseColor <- color;
+		danceChance <- rnd(0.75, 1.0);
+	}
+	action do_interaction{
+		//Ask "do you want to dance" interaction. 
+		//starts by already dancing and inviting in :P 
+		if(flip(danceChance)){
+			danceTimer <- 100;
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want to dance?", Bar[0]];			// ask if they wanna dance
+			target <- nil;
+		
+		}
+		
 	}
 }
 
@@ -172,6 +202,7 @@ experiment my_test type: gui {
 			species Introvert aspect:base;
 			species Extrovert aspect:base;
 			species Bar aspect:base;
+			species Dancer aspect:base;
 			
 		}
 	}
