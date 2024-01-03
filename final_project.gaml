@@ -15,8 +15,8 @@ global {
 	init {
 		create Bar;
 		
-		create Introvert with: (target: Bar[0]);
-		create Extrovert with: (target: Bar[0]);
+		create Introvert with: (target: nil);
+		create Extrovert with: (target: Introvert[0]);
 	}
 	
 }
@@ -51,7 +51,40 @@ species Guest skills: [moving, fipa]{
 	reflex wander when: target = nil {
 		do wander;
 	}
-	
+		reflex respond_to_proposal when: !empty(informs){
+		loop proposaltest over: informs{
+			string s <- proposaltest.contents[0] as string;
+			Guest sender <- proposaltest.sender as Guest;
+						Bar targetBar <- proposaltest.contents[1] as Bar;
+			
+			
+			switch(s){
+				match "Do you want a drink?"{
+					//Switch case 1: Being asked out for a drink?
+					//Respond to sender
+					if(flip(generosity)){ 
+						do inform message: proposaltest contents: ["Yes please, I want a drink.", targetBar];
+					}
+					else{
+						do inform message: proposaltest contents: ["No, thank you, I don't want a drink.", targetBar];
+					}
+				}
+				match "Yes please, I want a drink."{					
+					if 5 < location distance_to(targetBar.location){
+						sender.target <- targetBar;
+						target <- targetBar;
+					}
+					else{
+						write(name + "buys drink for" + sender.name);
+						money <- money - 1;
+						targetBar.money <- targetBar.money + 1;
+						sender.loudness <- sender.loudness + 1;
+					}
+				}
+			}
+			
+		}
+	}
 	reflex interact {
 		list<agent> nearby <- (agents of_generic_species Guest) at_distance(5);
 		
@@ -107,24 +140,26 @@ species Extrovert parent: Guest {
 		generosity <- 0.8;
 		color <- rgb("red");
 	}
-	
+
+
 	action do_interaction {
 		
 		// if they are feeling generous and have money try buying a drink
 		if flip(generosity) and money >= 1.0 {
+				//TODO: add charisma system?
+			Bar b <- Bar[rnd(length(Bar)-1)];
 				
-			// ask if they want drink
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want a drink?", b];			// ask if they want drink
+			
+			
+			
+			
+			
 			ask target as Guest{
 				// buying a drink for target
 				write  myself.name + " buying a drink for " + self.name;
-			
-				self.target <- Bar[0];
-				myself.target <- Bar[0];
 				
-				myself.money <- myself.money - 1.0;
-				self.loudness <- self.loudness + 1.0;
-				Bar[0].money <- Bar[0].money + 1.0;
-					
+
 			}
 		}
 	}
