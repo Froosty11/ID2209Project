@@ -60,7 +60,7 @@ species Guest skills: [moving, fipa]{
 	string currentLocation;
 	
 	float danceChance <- rnd(1.0);
-	float danceTimer <- 0.0;
+	float danceTimer <- -1.0;
 	
 	reflex move when: target != nil {
 		do goto target:target;
@@ -180,7 +180,7 @@ species Guest skills: [moving, fipa]{
 		//write name + " loudness: " + loudness;
 	}
 	
-	reflex dancing when: time < danceTimer{
+	reflex dancing when: time <= danceTimer{
 		color <- rnd_color(255);
 		if(danceTimer = time){
 			write name + " stopped dancing";
