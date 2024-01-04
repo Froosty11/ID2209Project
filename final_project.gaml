@@ -50,6 +50,7 @@ species Guest skills: [moving, fipa]{
 	float generosity;
 	float money <- 100.0;
 	float loudness;
+	bool busy <- false;
 	rgb color;
 	rgb baseColor;
 	agent target;
@@ -71,12 +72,14 @@ species Guest skills: [moving, fipa]{
 				write name + " arrived at foodcourt";
 				currentLocation <- "FoodCourt";
 				target <- nil;
+				busy <- false;
 			}
 			// if we arrive at the bar set location to the bar
 			else if target = Bar[0] {
 				write name + " arrived at bar";
 				currentLocation <- "Bar";
 				target <- nil;
+				busy <- false;
 			}
 			
 			
@@ -93,14 +96,16 @@ species Guest skills: [moving, fipa]{
 		}
 		
 		// if we are hungry go to foodcourt
-		if hunger > 100.0 and target = nil and currentLocation != "FoodCourt"{
+		if hunger > 100.0 and !busy and currentLocation != "FoodCourt"{
 			write name + " is hungry going to food court";
+			busy <- true;
 			target <- FoodCourt[0];
 		}
 		
 		// if we are not hungry go party
-		else if hunger = 0.0 and target = nil {
+		else if hunger = 0.0 and !busy {
 			write name + " is fed and going to the bar";
+			busy <- true;
 			target <- Bar[0];
 		}
 		
@@ -125,18 +130,20 @@ species Guest skills: [moving, fipa]{
 				match "Do you want a drink?"{
 					//Switch case 1: Being asked out for a drink?
 					//Respond to sender
-					if(flip(generosity) and target = nil){ 
+					if(flip(generosity) and !busy){ 
 						do inform message: proposaltest contents: ["Yes please, I want a drink.", targetBar];
 						target <- sender;
+						busy <- true;
 					}
 					else{
 						do inform message: proposaltest contents: ["No, thank you, I don't want a drink.", targetBar];
 					}
 				}
 				match "Do you want to dance?"{
-					if(flip(danceChance) and target = nil){
+					if(flip(danceChance) and !busy){
 						write(name + "joins in dancing with " + sender.name);
 						danceTimer <- time + 20.0;
+						busy <- true;
 					}
 				}
 			}
@@ -147,7 +154,7 @@ species Guest skills: [moving, fipa]{
 		list<agent> nearby <- (agents of_generic_species Guest) at_distance(5);
 		
 		// if the agent doesnt have a target and there is a
-		if target = nil and !empty(nearby) and time = try_to_interact {
+		if !busy and !empty(nearby) and time = try_to_interact {
 			// chose a person to interact with
 			
 			if flip(interaction_chance) {
@@ -175,10 +182,10 @@ species Guest skills: [moving, fipa]{
 	
 	reflex dancing when: time < danceTimer{
 		color <- rnd_color(255);
-		do wander;
 		if(danceTimer = time){
+			write name + " stopped dancing";
 			color <- baseColor;
-			target <- nil;
+			busy <- false;
 		}
 	}
 	
@@ -201,6 +208,7 @@ species Introvert parent: Guest {
 	action do_interaction {
 		
 		target <- nil;
+		busy <- false;
 	}
 }
 
@@ -220,6 +228,7 @@ species Extrovert parent: Guest {
 			//TODO: add charisma system?
 			Bar b <- Bar[rnd(length(Bar)-1)];
 			write name + " ask " + target + " for a drink";
+			busy <- true;
 			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want a drink?", b];			// ask if they want drink
 			
 		}
@@ -250,6 +259,8 @@ species Extrovert parent: Guest {
 						sender.loudness <- sender.loudness + 1;
 						target <- nil;
 						sender.target <- nil;
+						busy <- false;
+						sender.busy <- false;
 					}
 					do end_conversation message: proposaltest contents: ["end"];
 					
@@ -257,6 +268,7 @@ species Extrovert parent: Guest {
 				match "No, thank you, I don't want a drink." {
 					write name + " receives answer 'No I don't want drink'";
 					target <- nil;
+					busy <- false;
 					do end_conversation message: proposaltest contents: ["end"];
 					
 				}
@@ -278,8 +290,11 @@ species Dancer parent: Guest{
 		//Ask "do you want to dance" interaction. 
 		//starts by already dancing and inviting in :P 
 		if(flip(danceChance)){
+			write name + " starting to dance";
+			busy <- true;
 			danceTimer <- time + 20.0;
-			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want to dance?", Bar[0]];			// ask if they wanna dance
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want to dance?", Bar[0]];
+			target <- nil;
 		
 		}
 		
