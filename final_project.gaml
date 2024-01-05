@@ -24,8 +24,8 @@ global {
 		create Bar;
 		create FoodCourt;
 		create Dancer;
-		create Introvert;
-		create Extrovert;
+		create Introvert number: 5;
+		create Extrovert number: 5;
 	}
 }
 
@@ -61,10 +61,9 @@ species Guest skills: [moving, fipa]{
 	
 	float danceChance <- rnd(1.0);
 	float danceTimer <- -1.0;
+	float talkTime <- -1.0;
 	
 	reflex move when: target != nil {
-		do goto target:target;
-		
 		if location distance_to(target) < 1 {
 			
 			// if we arrive at the foodcourt set location to foodcourt
@@ -83,6 +82,9 @@ species Guest skills: [moving, fipa]{
 			}
 			
 			
+		}
+		else {
+			do goto target:target;
 		}
 	}
 	
@@ -119,17 +121,19 @@ species Guest skills: [moving, fipa]{
 		
 	}
 	
-	reflex respond_to_proposal when: !empty(informs){
-		loop proposaltest over: informs{
+	reflex respond_to_proposal when: !empty(proposes){
+		loop proposaltest over: proposes{
 			string s <- proposaltest.contents[0] as string;
 			Guest sender <- proposaltest.sender as Guest;
-			Bar targetBar <- proposaltest.contents[1] as Bar;
+			
 			
 			
 			switch(s){
 				match "Do you want a drink?"{
 					//Switch case 1: Being asked out for a drink?
 					//Respond to sender
+					write name + " receives question if you want a drink from " + sender;
+					Bar targetBar <- proposaltest.contents[1] as Bar;
 					if(flip(generosity) and !busy){ 
 						do inform message: proposaltest contents: ["Yes please, I want a drink.", targetBar];
 						target <- sender;
@@ -144,6 +148,18 @@ species Guest skills: [moving, fipa]{
 						write(name + "joins in dancing with " + sender.name);
 						danceTimer <- time + 20.0;
 						busy <- true;
+					}
+				}
+				match "Do you want to talk?"{
+					if(!busy and flip(interaction_chance)){
+						write(name + "starts talking with " + sender.name);
+						busy <- true;
+						target <- sender;
+						talkTime <- time + 10.0;
+						do inform message: proposaltest contents: ["Yes let's talk"];
+					}
+					else {
+						do inform message: proposaltest contents: ["No, thank you, I am busy"];
 					}
 				}
 			}
@@ -189,6 +205,14 @@ species Guest skills: [moving, fipa]{
 		}
 	}
 	
+	reflex talking when: time <= talkTime{
+		if(talkTime = time){
+			write name + " stopped talking";
+			target <- nil;
+			busy <- false;
+		}
+	}
+	
 	action do_interaction virtual: true;
 	
 	aspect base {
@@ -202,19 +226,44 @@ species Introvert parent: Guest {
 		generosity <- rnd(1.0);
 		baseColor <- rgb("blue");
 		color <- baseColor;
+		interaction_chance <- 0.2;
 		
 	}
 	
 	action do_interaction {
+		Guest t <- target as Guest;
+		// start a conversation 
+		busy <- true;
+		do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Do you want to talk?"];
 		
-		target <- nil;
-		busy <- false;
+	}
+	
+	reflex receive_answer when: !empty(informs){
+		loop proposaltest over: informs{	
+			switch(proposaltest.contents[0] as string){
+				// introvert receive answers
+				match "Yes let's talk"{
+					write name + " receives answer yes";
+					talkTime <- time + 10.0;
+					do end_conversation message: proposaltest contents: ["end"];
+				}
+				match "No, thank you, I am busy"{
+					write name + " receives answer no";
+					
+					busy <- false;
+					target <- nil;
+					do end_conversation message: proposaltest contents: ["end"];
+				}
+			}
+		}
+		write name + " answer informs " +informs;
+	
 	}
 }
 
 species Extrovert parent: Guest {
 	init {
-		loudness <- 0.0;
+		loudness <- 50.0;
 		generosity <- 0.8;
 		baseColor <- rgb("red");
 		color <- baseColor;
@@ -229,7 +278,7 @@ species Extrovert parent: Guest {
 			Bar b <- Bar[rnd(length(Bar)-1)];
 			write name + " ask " + target + " for a drink";
 			busy <- true;
-			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want a drink?", b];			// ask if they want drink
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Do you want a drink?", b];			// ask if they want drink
 			
 		}
 		else {
@@ -293,7 +342,7 @@ species Dancer parent: Guest{
 			write name + " starting to dance";
 			busy <- true;
 			danceTimer <- time + 20.0;
-			do start_conversation to: [target] protocol: 'no-protocol' performative: 'inform' contents: ["Do you want to dance?", Bar[0]];
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Do you want to dance?", Bar[0]];
 			target <- nil;
 		
 		}
