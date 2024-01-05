@@ -20,7 +20,7 @@ model finalproject
 
 
 global {
-	float size <- 10.0;
+	float size <- 20.0;
 	float guest_shoulder_length <- 1.0;
 	bool avoid_others <- true;
 	init {
@@ -30,9 +30,6 @@ global {
 		create Introvert number: 12;
 		create Extrovert number: 12;
 	}
-	//list test {
-	//	return f agents_at_distance(5)
-	//}
 }
 
 species FoodCourt {
@@ -54,21 +51,24 @@ species Bar {
 
 species Guest skills: [moving, fipa, pedestrian]{
 	float generosity;
-	float money <- 100.0;
+	float startMoney <- 100.0;
+	float money;
 	float loudness;
+	float happiness <- 10.0;
 	bool busy <- false;
 	rgb color;
 	rgb baseColor;
 	agent target;
 	float interaction_chance <- 1.0;
 	float try_to_interact <- 1.0;
-	float hunger <- 0.0;
+	float hunger <- rnd(100.0);
 	string currentLocation;
-	int nearby_people_limit <- 10000;
 	
 	float danceChance <- rnd(1.0);
 	float danceTimer <- -1.0;
 	float talkTime <- -1.0;
+	int nearby_people_limit <- 10000;
+	
     
     action initialize_pedestrian_parameters {
     	 pedestrian_model <- "simple"; // Can also be "advanced", but then you need to set corresponding parameters
@@ -86,7 +86,8 @@ species Guest skills: [moving, fipa, pedestrian]{
     }
     
     init {
-       do initialize_pedestrian_parameters;
+    	money <- startMoney;
+        do initialize_pedestrian_parameters;
     }
 	reflex move when: target != nil {
 		if location distance_to(target) < 1 {
@@ -107,30 +108,31 @@ species Guest skills: [moving, fipa, pedestrian]{
 			}
 		}
 		
-		else{
+		else {
 			do walky_thingy t: target.location;
 		}
 	}
+	
 	action walky_thingy (point t) {
-    // Create a circle shape around the target point with a radius of 10
-    geometry area_of_interest <- circle(7, t);
-
-    // find all Guest agents within this circle
-    list<Guest> agents_nearby <- list((agents of_generic_species Guest) inside area_of_interest);
-
-    int number_of_agents_nearby <- length(agents_nearby);
-
-    write("Number of agents nearby: " + number_of_agents_nearby);
-
-    // If below the nearby_people_limit, execute the walk_to action
-    if (nearby_people_limit > number_of_agents_nearby) {
-        do walk_to target: t;
-    }
-    else{
-    	//otherwise random walk til u find a place
-    	point newTarget <- {location.x + rnd(-size, size), location.y + rnd(-size, size)} as point;
-	    do walky_thingy t: newTarget;
-    }
+	    // Create a circle shape around the target point with a radius of 10
+	    geometry area_of_interest <- circle(7, t);
+	
+	    // find all Guest agents within this circle
+	    list<Guest> agents_nearby <- list((agents of_generic_species Guest) inside area_of_interest);
+	
+	    int number_of_agents_nearby <- length(agents_nearby);
+	
+	    write("Number of agents nearby: " + number_of_agents_nearby);
+	
+	    // If below the nearby_people_limit, execute the walk_to action
+	    if (nearby_people_limit > number_of_agents_nearby) {
+	        do walk_to target: t;
+	    }
+	    else{
+	    	//otherwise random walk til u find a place
+	    	point newTarget <- {location.x + rnd(-size, size), location.y + rnd(-size, size)} as point;
+		    do walky_thingy t: newTarget;
+	    }
 }
 	
 	reflex wander when: (target = nil) {
@@ -151,7 +153,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 		}
 		
 		// if we are not hungry go party
-		else if hunger = 0.0 and !busy {
+		else if (time = 0.0 or hunger = 0.0) and !busy {
 			write name + " is fed and going to the bar";
 			busy <- true;
 			target <- Bar[0];
@@ -236,7 +238,6 @@ species Guest skills: [moving, fipa, pedestrian]{
 			try_to_interact <- time + rnd(5,10);
 		}
 		
-		//write (agents of_generic_species Guest) at_distance(5);
 	}
 	
 	reflex debug_print {
@@ -245,6 +246,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 	
 	reflex dancing when: time <= danceTimer{
 		color <- rnd_color(255);
+		happiness <- happiness + 0.1;
 		if(danceTimer = time){
 			write name + " stopped dancing";
 			color <- baseColor;
@@ -253,6 +255,12 @@ species Guest skills: [moving, fipa, pedestrian]{
 	}
 	
 	reflex talking when: time <= talkTime{
+		Guest t <- target as Guest;
+		if (t.loudness <= loudness) {
+			happiness <- happiness + 0.3;
+		} else {
+			happiness <- happiness - 0.1;
+		}
 		if(talkTime = time){
 			write name + " stopped talking";
 			target <- nil;
@@ -274,10 +282,8 @@ species Introvert parent: Guest {
 		baseColor <- rgb("blue");
 		color <- baseColor;
 		interaction_chance <- 0.2;
-		proba_detour <- proba_detour*10;
-       	obstacle_consideration_distance <- 10* obstacle_consideration_distance;
-      	pedestrian_consideration_distance <- 10* pedestrian_consideration_distance;
-      	nearby_people_limit <- 11;
+		nearby_people_limit <- 11;
+		
 	}
 	
 	action do_interaction {
@@ -298,6 +304,8 @@ species Introvert parent: Guest {
 					do end_conversation message: proposaltest contents: ["end"];
 				}
 				match "No, thank you, I am busy"{
+					happiness <- happiness - 0.1;
+					
 					write name + " receives answer no";
 					
 					busy <- false;
@@ -343,6 +351,7 @@ species Extrovert parent: Guest {
 			switch(s){
 				// extrovert receive answers
 				match "Yes please, I want a drink."{
+					happiness <- happiness + 0.5;
 					write name + " receives answer 'Yes I want drink";
 					Guest sender <- proposaltest.sender as Guest;
 					Bar targetBar <- proposaltest.contents[1] as Bar;
@@ -365,6 +374,8 @@ species Extrovert parent: Guest {
 					
 				}
 				match "No, thank you, I don't want a drink." {
+					happiness <- happiness - 0.1;
+					
 					write name + " receives answer 'No I don't want drink'";
 					target <- nil;
 					busy <- false;
@@ -379,7 +390,7 @@ species Extrovert parent: Guest {
 
 species Dancer parent: Guest{
 	init{
-		loudness <- 4.0;
+		loudness <- 40.0;
 		generosity <- rnd(0.0, 0.7);
 		baseColor <- rgb("pink");
 		color <- baseColor;
@@ -414,13 +425,19 @@ experiment my_test type: gui {
 		}
 		
 		display charts {
-			
 			chart "Guest spent" {
-				float totalMoney <- sum((agents of_generic_species Guest) collect (each.money));
-				data "Total money " value: totalMoney;
-				
+				data "Guest total spent money " value: sum((agents of_generic_species Guest) collect (each.startMoney - each.money));
 			}
+			
+			
+		}
 		
+		display graph {
+			chart "Guest happiness" type: histogram {
+				loop g over: (agents of_generic_species Guest) {
+					data g.name value: g.happiness color: g.color;
+				}
+			}
 		}
 	}
 }
