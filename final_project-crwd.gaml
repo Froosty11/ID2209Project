@@ -26,9 +26,9 @@ global {
 	init {
 		create Bar;
 		create FoodCourt;
-		create Dancer number: 4;
-		create Introvert number: 12;
-		create Extrovert number: 12;
+		create Dancer number: 10;
+		create Introvert number: 10;
+		create Extrovert number: 10;
 	}
 }
 
@@ -67,6 +67,8 @@ species Guest skills: [moving, fipa, pedestrian]{
 	float danceChance <- rnd(1.0);
 	float danceTimer <- -1.0;
 	float talkTime <- -1.0;
+	float stamina <- 100.0;
+	
 	int nearby_people_limit <- 10000;
 	
     
@@ -96,6 +98,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 			if target = FoodCourt[0] {
 				write name + " arrived at foodcourt";
 				currentLocation <- "FoodCourt";
+				money <- money - 5.0;
 				target <- nil;
 				busy <- false;
 			}
@@ -122,7 +125,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 	
 	    int number_of_agents_nearby <- length(agents_nearby);
 	
-	    write("Number of agents nearby: " + number_of_agents_nearby);
+	    //write("Number of agents nearby: " + number_of_agents_nearby);
 	
 	    // If below the nearby_people_limit, execute the walk_to action
 	    if (nearby_people_limit > number_of_agents_nearby) {
@@ -137,6 +140,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 	
 	reflex wander when: (target = nil) {
 	    point newTarget <- {location.x + rnd(-size, size), location.y + rnd(-size, size)} as point;
+	    stamina <- stamina + 0.3;
 	    do walky_thingy t: newTarget;
     }
 	
@@ -192,10 +196,14 @@ species Guest skills: [moving, fipa, pedestrian]{
 					}
 				}
 				match "Do you want to dance?"{
-					if(flip(danceChance) and !busy){
+					if(flip(danceChance) and !busy and stamina >= 4.0){
 						write(name + "joins in dancing with " + sender.name);
 						danceTimer <- time + 20.0;
 						busy <- true;
+						do inform message: proposaltest contents: ["Ok I will"];
+					}
+					else {
+						do inform message: proposaltest contents: ["No"];
 					}
 				}
 				match "Do you want to talk?"{
@@ -216,7 +224,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 		
 		}
 	reflex interact{
-		list<agent> nearby <- (agents of_generic_species Guest) at_distance(5);
+		list<agent> nearby <- (agents of_generic_species Guest) at_distance(7);
 		
 		// if the agent doesnt have a target and there is a
 		if !busy and !empty(nearby) and time = try_to_interact {
@@ -247,6 +255,7 @@ species Guest skills: [moving, fipa, pedestrian]{
 	reflex dancing when: time <= danceTimer{
 		color <- rnd_color(255);
 		happiness <- happiness + 0.1;
+		stamina <- stamina - 0.2;
 		if(danceTimer = time){
 			write name + " stopped dancing";
 			color <- baseColor;
@@ -294,6 +303,10 @@ species Introvert parent: Guest {
 		
 	}
 	
+	reflex not_busy when: !busy {
+		happiness <- happiness + 0.1;
+	}
+	
 	reflex receive_answer when: !empty(informs){
 		loop proposaltest over: informs{	
 			switch(proposaltest.contents[0] as string){
@@ -324,10 +337,8 @@ species Extrovert parent: Guest {
 		loudness <- 50.0;
 		generosity <- 0.8;
 		baseColor <- rgb("red");
-		color <- baseColor;
-		
+		color <- baseColor;		
 	}
-
 
 	action do_interaction {
 		// if they are feeling generous and have money try buying a drink
@@ -344,6 +355,10 @@ species Extrovert parent: Guest {
 		}
 	}
 	
+	reflex when_busy when: busy {
+		happiness <- happiness + 0.1;
+	}
+	
 	reflex receive_answer when: !empty(informs){
 		loop proposaltest over: informs{
 			string s <- proposaltest.contents[0] as string;
@@ -351,7 +366,6 @@ species Extrovert parent: Guest {
 			switch(s){
 				// extrovert receive answers
 				match "Yes please, I want a drink."{
-					happiness <- happiness + 0.5;
 					write name + " receives answer 'Yes I want drink";
 					Guest sender <- proposaltest.sender as Guest;
 					Bar targetBar <- proposaltest.contents[1] as Bar;
@@ -369,6 +383,7 @@ species Extrovert parent: Guest {
 						sender.target <- nil;
 						busy <- false;
 						sender.busy <- false;
+						happiness <- happiness + 0.5;
 					}
 					do end_conversation message: proposaltest contents: ["end"];
 					
@@ -399,15 +414,36 @@ species Dancer parent: Guest{
 	action do_interaction{
 		//Ask "do you want to dance" interaction. 
 		//starts by already dancing and inviting in :P 
-		if(flip(danceChance)){
+		if(flip(danceChance) and stamina >= 4.0){
 			write name + " starting to dance";
 			busy <- true;
 			danceTimer <- time + 20.0;
-			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Do you want to dance?", Bar[0]];
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Do you want to dance?"];
 			target <- nil;
 		
-		}
+		}	
+	}
+	
+	
+	reflex receive_answer when: !empty(informs){
+			loop proposaltest over: informs{
+				string s <- proposaltest.contents[0] as string;
 		
+				switch(s){
+					// dancer receive answers
+					match "Ok I will"{
+						happiness <- happiness + 0.2;
+						do end_conversation message: proposaltest contents: ["end"];
+						
+					}
+					match "No" {
+						happiness <- happiness - 0.6;
+						do end_conversation message: proposaltest contents: ["end"];
+						
+					}
+				}
+		}
+	
 	}
 }
 
@@ -420,7 +456,6 @@ experiment my_test type: gui {
 			species Bar aspect:base;
 			species FoodCourt aspect:base;
 			species Dancer aspect:base;
-			
 			
 		}
 		
