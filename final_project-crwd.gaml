@@ -29,6 +29,8 @@ global {
 		create Dancer number: 10;
 		create Introvert number: 10;
 		create Extrovert number: 10;
+		create PoorGuest number: 10;
+		create RichGuest number: 10;
 	}
 }
 
@@ -216,6 +218,29 @@ species Guest skills: [moving, fipa, pedestrian]{
 					}
 					else {
 						do inform message: proposaltest contents: ["No, thank you, I am busy"];
+					}
+				}
+				match "Can you spare some money?"{
+					float ask_money <- proposaltest.contents[1] as float;
+					if(!busy and flip(generosity) and money > ask_money){
+						write(name + " gives money to " + sender.name);
+						money <- money - ask_money;
+						do inform message: proposaltest contents: ["Sure here you go", ask_money];
+					}
+					else {
+						do inform message: proposaltest contents: ["No sorry"];
+					}
+				}
+				match "Here take some money"{
+					float amount <- proposaltest.contents[1] as float;
+					if(!busy){
+						write(name + " takes money from " + sender.name);
+						money <- money + amount;
+						happiness <- happiness + 0.1;
+						do inform message: proposaltest contents: ["Thank you so much",amount];
+					}
+					else {
+						do inform message: proposaltest contents: ["No thank you"];
 					}
 				}
 			}
@@ -447,6 +472,97 @@ species Dancer parent: Guest{
 	}
 }
 
+species PoorGuest parent: Guest{
+	init{
+		loudness <- 20.0;
+		startMoney <- 0.0;
+		money <- 0.0;
+		baseColor <- rgb("grey");
+		generosity <- 0.1;
+		color <- baseColor;
+	}
+	action do_interaction{
+		if(money <= 5.0){
+			write name + " asking for money";
+			busy <- true;
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Can you spare some money?", 5.0];
+		
+		}	
+	}
+	
+	
+	reflex receive_answer when: !empty(informs){
+			loop proposaltest over: informs{
+				string s <- proposaltest.contents[0] as string;
+		
+				switch(s){
+					match "Sure here you go"{
+						float amount <- proposaltest.contents[1] as float;
+						happiness <- happiness + 0.8;
+						money <- money + amount;
+						busy <- false;
+						target <- nil;
+						do end_conversation message: proposaltest contents: ["end"];
+						
+					}
+					match "No sorry" {
+						happiness <- happiness - 0.1;
+						do end_conversation message: proposaltest contents: ["end"];
+						busy <- false;
+						target <- nil;
+						
+					}
+				}
+		}
+	
+	}
+}
+
+species RichGuest parent: Guest{
+	init{
+		loudness <- rnd(5.0, 50.0);
+		startMoney <- 1000.0;
+		money <- 1000.0;
+		baseColor <- rgb("yellow");
+		generosity <- 0.5;
+		color <- baseColor;
+	}
+	action do_interaction{
+		if(flip(generosity) and money >= 5.0){
+			write name + " giving away money";
+			busy <- true;
+			do start_conversation to: [target] protocol: 'no-protocol' performative: 'propose' contents: ["Here take some money", 5.0];
+		
+		}	
+	}
+	
+	
+	reflex receive_answer when: !empty(informs){
+			loop proposaltest over: informs{
+				string s <- proposaltest.contents[0] as string;
+		
+				switch(s){
+					match "Thank you so much"{
+						float amount <- proposaltest.contents[1] as float;
+						happiness <- happiness + 0.5;
+						money <- money - amount;
+						busy <- false;
+						target <- nil;
+						do end_conversation message: proposaltest contents: ["end"];
+						
+					}
+					match "No thank you" {
+						happiness <- happiness - 0.1;
+						do end_conversation message: proposaltest contents: ["end"];
+						busy <- false;
+						target <- nil;
+						
+					}
+				}
+		}
+	
+	}
+}
 
 experiment my_test type: gui {
 	output {
@@ -456,6 +572,8 @@ experiment my_test type: gui {
 			species Bar aspect:base;
 			species FoodCourt aspect:base;
 			species Dancer aspect:base;
+			species PoorGuest aspect:base;
+			species RichGuest aspect:base;
 			
 		}
 		
