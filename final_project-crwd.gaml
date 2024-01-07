@@ -20,6 +20,10 @@ model finalproject
 
 
 global {
+	float money_max <- 500.0;
+	float money_min <- 20.0;
+	float happy_max <- 20.0;
+	float happy_min <- 5.0;
 	float size <- 20.0;
 	float guest_shoulder_length <- 1.0;
 	bool avoid_others <- true;
@@ -53,10 +57,10 @@ species Bar {
 
 species Guest skills: [moving, fipa, pedestrian]{
 	float generosity;
-	float startMoney <- 100.0;
+	float startMoney <- rnd(money_min, money_max);
 	float money;
 	float loudness;
-	float happiness <- 10.0;
+	float happiness <- rnd(happy_min, happy_max);
 	bool busy <- false;
 	rgb color;
 	rgb baseColor;
@@ -317,6 +321,9 @@ species Introvert parent: Guest {
 		color <- baseColor;
 		interaction_chance <- 0.2;
 		nearby_people_limit <- 11;
+		proba_detour <- proba_detour*2;
+       	obstacle_consideration_distance <- 2* obstacle_consideration_distance;
+      	pedestrian_consideration_distance <- 2* pedestrian_consideration_distance;
 		
 	}
 	
@@ -522,7 +529,7 @@ species RichGuest parent: Guest{
 	init{
 		loudness <- rnd(5.0, 50.0);
 		startMoney <- 1000.0;
-		money <- 1000.0;
+		money <- 1000;
 		baseColor <- rgb("yellow");
 		generosity <- 0.5;
 		color <- baseColor;
